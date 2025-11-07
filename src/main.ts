@@ -11,10 +11,14 @@ if (!app) {
   throw new Error("#app element not found");
 }
 
+// バッファ用
+const p = new THREE.Vector3();
+const flow = new THREE.Vector3();
+
 // レンダラーの作成
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(devicePixelRatio);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 app.appendChild(renderer.domElement);
 
 // シーンの作成
@@ -37,39 +41,48 @@ controls.autoRotateSpeed = 0.8;
 
 // Curl Noiseの実装
 const noise = new SimplexNoise();
-function curlNoise(x: number, y: number, z: number) {
-  const e = 0.0001;
+const Fx1 = new THREE.Vector3();
+const Fx2 = new THREE.Vector3();
+const Fy1 = new THREE.Vector3();
+const Fy2 = new THREE.Vector3();
+const Fz1 = new THREE.Vector3();
+const Fz2 = new THREE.Vector3();
 
-  // Noise field F
-  const F = (x: number, y: number, z: number) =>
-    new THREE.Vector3(
-      noise.noise3d(y, z, x),
-      noise.noise3d(z, x, y),
-      noise.noise3d(x, y, z),
-    );
-
-  const F_x1 = F(x + e, y, z);
-  const F_x2 = F(x - e, y, z);
-  const F_y1 = F(x, y + e, z);
-  const F_y2 = F(x, y - e, z);
-  const F_z1 = F(x, y, z + e);
-  const F_z2 = F(x, y, z - e);
-
-  return new THREE.Vector3(
-    (F_y1.z - F_y2.z - (F_z1.y - F_z2.y)) / (2 * e),
-    (F_z1.x - F_z2.x - (F_x1.z - F_x2.z)) / (2 * e),
-    (F_x1.y - F_x2.y - (F_y1.x - F_y2.x)) / (2 * e),
+function sampleF(x: number, y: number, z: number, out: THREE.Vector3) {
+  out.set(
+    noise.noise3d(y, z, x),
+    noise.noise3d(z, x, y),
+    noise.noise3d(x, y, z),
   );
+  return out;
+}
+
+function curlNoise(x: number, y: number, z: number, out: THREE.Vector3) {
+  const e = 1e-4;
+  sampleF(x + e, y, z, Fx1);
+  sampleF(x - e, y, z, Fx2);
+  sampleF(x, y + e, z, Fy1);
+  sampleF(x, y - e, z, Fy2);
+  sampleF(x, y, z + e, Fz1);
+  sampleF(x, y, z - e, Fz2);
+
+  out.set(
+    (Fy1.z - Fy2.z - (Fz1.y - Fz2.y)) / (2 * e),
+    (Fz1.x - Fz2.x - (Fx1.z - Fx2.z)) / (2 * e),
+    (Fx1.y - Fx2.y - (Fy1.x - Fy2.x)) / (2 * e),
+  );
+  return out;
 }
 
 // パーティクルの初期化
 const count = 2400;
+const spreadRange = 24;
 const positions = new Float32Array(count * 3);
 
 for (let i = 0; i < count; i++) {
-  positions[i * 3] = THREE.MathUtils.randFloatSpread(30);
-  positions[i * 3 + 1] = THREE.MathUtils.randFloatSpread(30);
-  positions[i * 3 + 2] = THREE.MathUtils.randFloatSpread(30);
+  positions[i * 3] = THREE.MathUtils.randFloatSpread(spreadRange);
+  positions[i * 3 + 1] = THREE.MathUtils.randFloatSpread(spreadRange);
+  positions[i * 3 + 2] = THREE.MathUtils.randFloatSpread(spreadRange);
 }
 
 // ジオメトリの作成
@@ -100,8 +113,8 @@ function makeCircleTexture() {
     size / 2,
     size / 2,
   );
-  gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
-  gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+  gradient.addColorStop(0, "rgba(255, 255, 255, 1)"); // 内側の円：不透明な白
+  gradient.addColorStop(1, "rgba(255, 255, 255, 0)"); // 外側の円：透明
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, size, size);
   const tex = new THREE.CanvasTexture(canvas);
@@ -116,20 +129,21 @@ material.needsUpdate = true;
 const points = new THREE.Points(geometry, material);
 scene.add(points);
 
-// ポストプロセスの実装
+// ポストプロセス処理
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 const bloom = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  1.8,    // strength
-  0.8,      // radius
-  0.0,   // threshold
+  1.8, // strength
+  0.8, // radius
+  0.0, // threshold
 );
 composer.addPass(bloom);
 
 const afterimage = new AfterimagePass();
 afterimage.uniforms["damp"].value = 0.86;
 composer.addPass(afterimage);
+composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 composer.setSize(window.innerWidth, window.innerHeight);
 
 // パーティクルをアニメーションさせる
@@ -138,21 +152,20 @@ function animate() {
 
   for (let i = 0; i < count; i++) {
     const ix = i * 3;
-    const iy = ix + 1;
-    const iz = ix + 2;
 
-    const p = new THREE.Vector3(pos[ix], pos[iy], pos[iz]);
-    const flow = curlNoise(p.x * 0.1, p.y * 0.1, p.z * 0.1);
+    // Curl Noiseのベクトル場flowをパーティクルの位置に加算
+    p.set(pos[ix], pos[ix + 1], pos[ix + 2]);
+    curlNoise(p.x * 0.1, p.y * 0.1, p.z * 0.1, flow);
     flow.multiplyScalar(0.003);
-
     pos[ix] += flow.x;
-    pos[iy] += flow.y;
-    pos[iz] += flow.z;
+    pos[ix + 1] += flow.y;
+    pos[ix + 2] += flow.z;
 
-    if (p.length() > 20) {
-      pos[ix] = THREE.MathUtils.randFloatSpread(20);
-      pos[iy] = THREE.MathUtils.randFloatSpread(20);
-      pos[iz] = THREE.MathUtils.randFloatSpread(20);
+    // パーティクルがspreadRangeよりも離れたら位置をリセット
+    if (p.length() > 30) {
+      pos[ix] = THREE.MathUtils.randFloatSpread(spreadRange);
+      pos[ix + 1] = THREE.MathUtils.randFloatSpread(spreadRange);
+      pos[ix + 2] = THREE.MathUtils.randFloatSpread(spreadRange);
     }
   }
 
@@ -169,5 +182,6 @@ window.addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   composer.setSize(window.innerWidth, window.innerHeight);
 });
