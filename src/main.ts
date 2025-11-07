@@ -10,16 +10,20 @@ const app = document.getElementById("app");
 if (!app) {
   throw new Error("#app element not found");
 }
+
+// レンダラーの作成
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(devicePixelRatio);
 app.appendChild(renderer.domElement);
 
+// シーンの作成
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000);
 
+// カメラの作成
 const camera = new THREE.PerspectiveCamera(
-  55,
+  75,
   innerWidth / innerHeight,
   0.1,
   1000,
@@ -29,6 +33,7 @@ camera.position.set(0, 0, 20);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.autoRotate = true;
+controls.autoRotateSpeed = 0.8;
 
 // Curl Noiseの実装
 const noise = new SimplexNoise();
@@ -57,8 +62,8 @@ function curlNoise(x: number, y: number, z: number) {
   );
 }
 
-// ====== Particles ======
-const count = 3000;
+// パーティクルの初期化
+const count = 2400;
 const positions = new Float32Array(count * 3);
 
 for (let i = 0; i < count; i++) {
@@ -67,6 +72,7 @@ for (let i = 0; i < count; i++) {
   positions[i * 3 + 2] = THREE.MathUtils.randFloatSpread(30);
 }
 
+// ジオメトリの作成
 const geometry = new THREE.BufferGeometry();
 geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
 
@@ -78,13 +84,15 @@ const material = new THREE.PointsMaterial({
   blending: THREE.AdditiveBlending,
 });
 
-// Particle Texture
-function makeCircleTexture(size = 64) {
-  const c = document.createElement("canvas");
-  c.width = size;
-  c.height = size;
-  const ctx = c.getContext("2d")!;
-  const g = ctx.createRadialGradient(
+// パーティクルのテクスチャを作成
+function makeCircleTexture() {
+  const size = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  // グラデーションのある円
+  const gradient = ctx.createRadialGradient(
     size / 2,
     size / 2,
     0,
@@ -92,11 +100,11 @@ function makeCircleTexture(size = 64) {
     size / 2,
     size / 2,
   );
-  g.addColorStop(0, "rgba(255,255,255,1)");
-  g.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = g;
+  gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
+  gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+  ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, size, size);
-  const tex = new THREE.CanvasTexture(c);
+  const tex = new THREE.CanvasTexture(canvas);
   tex.generateMipmaps = false;
   tex.minFilter = THREE.LinearFilter;
   tex.magFilter = THREE.LinearFilter;
@@ -108,14 +116,14 @@ material.needsUpdate = true;
 const points = new THREE.Points(geometry, material);
 scene.add(points);
 
-// Post-process
+// ポストプロセスの実装
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 const bloom = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  1.8, // strength
-  0.8, // radius
-  0.0, // threshold
+  1.8,    // strength
+  0.8,      // radius
+  0.0,   // threshold
 );
 composer.addPass(bloom);
 
@@ -124,14 +132,14 @@ afterimage.uniforms["damp"].value = 0.86;
 composer.addPass(afterimage);
 composer.setSize(window.innerWidth, window.innerHeight);
 
-// ====== Animation ======
+// パーティクルをアニメーションさせる
 function animate() {
   const pos = geometry.attributes.position.array;
 
   for (let i = 0; i < count; i++) {
-    const ix = i * 3,
-      iy = ix + 1,
-      iz = ix + 2;
+    const ix = i * 3;
+    const iy = ix + 1;
+    const iz = ix + 2;
 
     const p = new THREE.Vector3(pos[ix], pos[iy], pos[iz]);
     const flow = curlNoise(p.x * 0.1, p.y * 0.1, p.z * 0.1);
@@ -141,7 +149,7 @@ function animate() {
     pos[iy] += flow.y;
     pos[iz] += flow.z;
 
-    if (p.length() > 25) {
+    if (p.length() > 20) {
       pos[ix] = THREE.MathUtils.randFloatSpread(20);
       pos[iy] = THREE.MathUtils.randFloatSpread(20);
       pos[iz] = THREE.MathUtils.randFloatSpread(20);
@@ -151,12 +159,12 @@ function animate() {
   geometry.attributes.position.needsUpdate = true;
   controls.update();
   composer.render();
-  // renderer.render(scene, camera);
   requestAnimationFrame(animate);
 }
+
 animate();
 
-// Resize
+// ウィンドウリサイズ時の処理
 window.addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
