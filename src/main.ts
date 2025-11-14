@@ -143,6 +143,7 @@ composer.addPass(bloom);
 const afterimage = new AfterimagePass();
 afterimage.uniforms["damp"].value = 0.86;
 composer.addPass(afterimage);
+
 composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 composer.setSize(window.innerWidth, window.innerHeight);
 
