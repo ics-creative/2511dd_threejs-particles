@@ -6,10 +6,7 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { AfterimagePass } from "three/examples/jsm/postprocessing/AfterimagePass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 
-const app = document.getElementById("app");
-if (!app) {
-  throw new Error("#app element not found");
-}
+const app = document.getElementById("app")!;
 
 // レンダラーの作成
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -84,6 +81,7 @@ const material = new THREE.PointsMaterial({
   size: 0.12,
   transparent: true,
   opacity: 0.85,
+  depthWrite: false,
   blending: THREE.AdditiveBlending,
 });
 
@@ -93,10 +91,7 @@ function makeCircleTexture() {
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    throw new Error("Failed to get 2D rendering context");
-  }
+  const ctx = canvas.getContext("2d")!;
   // グラデーションのある円
   const gradient = ctx.createRadialGradient(
     size / 2,
@@ -111,13 +106,9 @@ function makeCircleTexture() {
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, size, size);
   const tex = new THREE.CanvasTexture(canvas);
-  tex.generateMipmaps = false;
-  tex.minFilter = THREE.LinearFilter;
-  tex.magFilter = THREE.LinearFilter;
   return tex;
 }
 material.map = makeCircleTexture();
-material.needsUpdate = true;
 
 const points = new THREE.Points(geometry, material);
 scene.add(points);
@@ -146,27 +137,26 @@ const noiseScale = 0.1;
 const flowStrength = 0.003;
 // パーティクルをアニメーションさせる
 function animate() {
-  const pos = geometry.attributes.position.array;
+  const pos = geometry.attributes.position;
 
   for (let i = 0; i < count; i++) {
-    const ix = i * 3;
     // Curl Noiseのベクトル場flowをパーティクルの位置に加算
-    const p = new THREE.Vector3(pos[ix], pos[ix + 1], pos[ix + 2]);
+    const p = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
     const flow = curlNoise(
       p.x * noiseScale,
       p.y * noiseScale,
       p.z * noiseScale,
     );
     flow.multiplyScalar(flowStrength);
-    pos[ix] += flow.x;
-    pos[ix + 1] += flow.y;
-    pos[ix + 2] += flow.z;
+    pos.setX(i, pos.getX(i) + flow.x);
+    pos.setY(i, pos.getY(i) + flow.y);
+    pos.setZ(i, pos.getZ(i) + flow.z);
 
     // パーティクルがrangeよりも離れたら位置をリセット
     if (p.length() > 2 * range) {
-      pos[ix] = THREE.MathUtils.randFloatSpread(range);
-      pos[ix + 1] = THREE.MathUtils.randFloatSpread(range);
-      pos[ix + 2] = THREE.MathUtils.randFloatSpread(range);
+      pos.setX(i, THREE.MathUtils.randFloatSpread(range));
+      pos.setY(i, THREE.MathUtils.randFloatSpread(range));
+      pos.setZ(i, THREE.MathUtils.randFloatSpread(range));
     }
   }
 
