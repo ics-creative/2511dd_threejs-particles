@@ -24,7 +24,7 @@ scene.background = new THREE.Color(0x000);
 // カメラの作成
 const camera = new THREE.PerspectiveCamera(
   75,
-  innerWidth / innerHeight,
+  window.innerWidth / window.innerHeight,
   0.1,
   1000,
 );
@@ -47,20 +47,20 @@ function sampleVectorField(x: number, y: number, z: number) {
 
 // 三次元ベクトル場の回転成分を近似で求める
 function curlNoise(x: number, y: number, z: number) {
-  const e = 1e-4;
+  const e = 0.0001;
   // パーティクル付近の6点をサンプリング
-  const Fx1 = sampleVectorField(x + e, y, z);
-  const Fx2 = sampleVectorField(x - e, y, z);
-  const Fy1 = sampleVectorField(x, y + e, z);
-  const Fy2 = sampleVectorField(x, y - e, z);
-  const Fz1 = sampleVectorField(x, y, z + e);
-  const Fz2 = sampleVectorField(x, y, z - e);
+  const fx1 = sampleVectorField(x + e, y, z);
+  const fx2 = sampleVectorField(x - e, y, z);
+  const fy1 = sampleVectorField(x, y + e, z);
+  const fy2 = sampleVectorField(x, y - e, z);
+  const fz1 = sampleVectorField(x, y, z + e);
+  const fz2 = sampleVectorField(x, y, z - e);
 
   // 回転成分を計算
   return new THREE.Vector3(
-    (Fy1.z - Fy2.z - (Fz1.y - Fz2.y)) / (2 * e),
-    (Fz1.x - Fz2.x - (Fx1.z - Fx2.z)) / (2 * e),
-    (Fx1.y - Fx2.y - (Fy1.x - Fy2.x)) / (2 * e),
+    (fy1.z - fy2.z - (fz1.y - fz2.y)) / (2 * e),
+    (fz1.x - fz2.x - (fx1.z - fx2.z)) / (2 * e),
+    (fx1.y - fx2.y - (fy1.x - fy2.x)) / (2 * e),
   );
 }
 
@@ -180,9 +180,9 @@ animate();
 
 // ウィンドウリサイズ時の処理
 window.addEventListener("resize", () => {
-  camera.aspect = innerWidth / innerHeight;
+  camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
+  renderer.setSize(window.innerWidth, window.innerHeight);
   composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   composer.setSize(window.innerWidth, window.innerHeight);
 });

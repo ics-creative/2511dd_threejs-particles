@@ -1,7 +1,7 @@
 {
   "name": "2511dd_threejs-particles",
+  "private": "true",
   "version": "1.0.0",
-  "main": "dist/main.js",
   "scripts": {
     "dev": "vite --open --host",
     "build": "tsc && vite build",
@@ -9,11 +9,6 @@
     "format": "biome format . --write",
     "lint": "biome lint --write"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/ics-creative/2511dd_threejs-particles.git"
-  },
-  "license": "ISC",
   "devDependencies": {
     "@biomejs/biome": "^2.3.4",
     "@types/three": "^0.181.0",
