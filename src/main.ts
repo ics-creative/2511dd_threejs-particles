@@ -62,11 +62,11 @@ function curlNoise(x: number, y: number, z: number) {
 }
 
 // パーティクルの初期化
-const count = 2400;
+const MAX = 2400;
 const range = 24;
-const positions = new Float32Array(count * 3);
+const positions = new Float32Array(MAX * 3);
 
-for (let i = 0; i < count; i++) {
+for (let i = 0; i < MAX; i++) {
   positions[i * 3] = THREE.MathUtils.randFloatSpread(range);
   positions[i * 3 + 1] = THREE.MathUtils.randFloatSpread(range);
   positions[i * 3 + 2] = THREE.MathUtils.randFloatSpread(range);
@@ -138,7 +138,7 @@ const flowStrength = 0.003;
 function animate() {
   const pos = geometry.attributes.position;
 
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < MAX; i++) {
     // Curl Noiseのベクトル場flowをパーティクルの位置に加算
     const p = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
     const flow = curlNoise(
